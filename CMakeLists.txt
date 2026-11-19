@@ -87,6 +87,29 @@ endif()
 
 rexglue_setup_target(nhllegacy)
 
+# The recompiled guest code reads guest memory through mismatched pointer types
+# and relies on exact PowerPC floating-point results. The SDK compiles itself with
+# -fno-strict-aliasing -ffp-model=strict (third_party/rexglue-sdk/CMakeLists.txt,
+# "Global compile options"), but add_compile_options() does not propagate to this
+# consumer project, so the generated code was being optimized without them. A
+# 2026-11-17 dev build (clang 22.1.8, -O2) without them rendered every UI string
+# as the wrong glyphs; see ROADMAP.md "First build on this PC".
+target_compile_options(nhllegacy PRIVATE -fno-strict-aliasing -ffp-model=strict)
+
+# Stage the prebuilt FidelityFX DLL next to the exe. It is linked as a delay-load
+# import, but Windows still refuses to start the exe when the DLL is absent
+# ("amd_fidelityfx_vk.dll was not found"), and the SDK's own staging helper is
+# not used by this target.
+if(WIN32)
+    find_file(NHL_FFX_VK_DLL amd_fidelityfx_vk.dll
+        PATHS ${CMAKE_PREFIX_PATH} PATH_SUFFIXES bin NO_DEFAULT_PATH)
+    if(NHL_FFX_VK_DLL)
+        add_custom_command(TARGET nhllegacy POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NHL_FFX_VK_DLL}" "$<TARGET_FILE_DIR:nhllegacy>"
+            VERBATIM)
+    endif()
+endif()
+
 # SPIKE (docs/vulkan-rov-backend-spike-prompt.md): the SDK's Vulkan ROV backend is
 # a COMPILE-TIME option (REXGLUE_USE_VULKAN, OFF in the stock win-amd64 zips). When
 # CMAKE_PREFIX_PATH points at an SDK built with it ON, enable this to compile the
