@@ -7,3 +7,8 @@
 
 # PowerShell tolerates LF, but keep our shipped drivers CRLF for consistency.
 *.ps1 text eol=crlf
+
+# SDK patches are applied with git apply, which needs their original LF line
+# endings byte-for-byte. With core.autocrlf=true a normal Windows checkout
+# rewrote them to CRLF and every hunk failed to apply. Keep them untouched.
+*.patch -text
