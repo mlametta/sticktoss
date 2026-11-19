@@ -21,7 +21,8 @@ if "%1"=="configure" (
     -DCMAKE_EXE_LINKER_FLAGS="-flto=thin -fuse-ld=lld" ^
     -DCMAKE_PREFIX_PATH=%VKSDK% ^
     -DNHLLEGACY_VULKAN_BACKEND=ON ^
-    -DNHLLEGACY_BUILD_PACKAGER=ON -DNHLLEGACY_BUILD_TRACE_TOOLS=OFF
+    -DNHLLEGACY_BUILD_PACKAGER=ON -DNHLLEGACY_BUILD_TRACE_TOOLS=OFF ^
+    %EXTRA_CMAKE_ARGS%
   echo CONFIGURE_EXIT=%ERRORLEVEL%
 ) else (
   REM Build both the port and the installer so they link the SAME Vulkan runtime

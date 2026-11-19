@@ -73,3 +73,7 @@
 
 # Vendored ReXGlue SDK (fetched + pinned + patched by scripts/setup_sdk.ps1)
 /third_party/rexglue-sdk/
+
+# === Machine-specific local settings (written by scripts/setup_toolchain.ps1 / scripts/_codegen.bat) ===
+/scripts/_env.local.bat
+/nhllegacy_manifest.local.toml

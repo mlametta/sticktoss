@@ -68,6 +68,54 @@ configure` then `scripts\_build_vk_opt.bat`. PGO flow: `_build_vk_pgogen.bat` �
 play a session → `llvm-profdata merge -output=pgo\nhllegacy.profdata *.profraw` →
 `_build_vk_pgo.bat`.
 
+## Alternative: portable toolchain (no Visual Studio, everything in one folder)
+
+Verified 2026-11-17 on a PC with no Visual Studio 2022, no LunarG Vulkan SDK and a
+nearly full C: drive. Every tool lives in one folder you choose (the example uses
+`F:\devtools`); nothing is installed or registered elsewhere, and builds keep
+`TEMP` inside that folder. Git must be on PATH for the setup scripts.
+
+```bat
+:: 1. Portable LLVM 22.1.8, CMake 3.31.11, Ninja 1.13.2, embeddable Python 3.12.10,
+::    and Microsoft's C/C++ runtime + Windows SDK fetched by xwin (Microsoft's
+::    license applies - -AcceptMicrosoftLicense agrees to it). Every download is
+::    SHA-256 checked. Also pre-fetches the sources CMake would clone with Git, and
+::    writes the git-ignored scripts\_env.local.bat that switches _env.bat over.
+powershell -ExecutionPolicy Bypass -File scripts\setup_toolchain.ps1 -Root F:\devtools -GameDir "F:\Games\NHL Legacy\game" -AcceptMicrosoftLicense
+
+:: 2. SDK source, pinned + patched (same script as the standard route).
+powershell -ExecutionPolicy Bypass -File scripts\setup_sdk.ps1
+
+:: 3. FidelityFX without Visual Studio: reuse the DLL from a release / your
+::    installed game and generate its import library with LLVM.
+scripts\_ffx_import_prebuilt.bat "F:\Games\NHL Legacy\amd_fidelityfx_vk.dll"
+
+:: 4. SDK configure + build + install.
+scripts\_ffx_sdk_configure.bat
+scripts\_ffx_sdk_build_install.bat
+
+:: 5. Codegen from a local copy of the manifest (NHL_GAME_DIR from _env.local.bat).
+scripts\_codegen.bat
+
+:: 6. Game: dev build, or the optimized build.
+scripts\_game_ffx_build.bat
+scripts\_build_vk_opt.bat configure
+scripts\_build_vk_opt.bat
+```
+
+Measured on an i7-9700: SDK build + install ~20 min, codegen ~15 min, dev game
+build ~9 min. Run a dev build without touching `Documents` by passing
+`--user_data_root <dir> --cache_root <dir>` (both are SDK cvars).
+
+Notes:
+- The Vulkan SDK is not needed on Windows: the SDK vendors Vulkan headers/volk and
+  only checks for the LunarG SDK on non-Windows (`cmake/rexglue_fidelityfx.cmake`).
+- Without Git inside the build environment the SDK version shows as
+  `0.8.0.0-dev.unknown` (window title, manifest `sdk_version`). Cosmetic.
+- The SDK install step still adds one CMake user-package-registry value under
+  `HKCU\Software\Kitware\CMake\Packages\rexglue` (`cmake/rexglue_install.cmake`
+  runs `reg add` unconditionally).
+
 ## Known deltas vs the original dev tree
 
 - **Solved:** the original SDK tree's unexplained `-dirty` state on the

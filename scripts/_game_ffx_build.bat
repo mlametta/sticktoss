@@ -8,6 +8,7 @@ cmake -S "%REPO_ROOT%" -B "out\build\win-amd64-vk-ffx" ^
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ^
   -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" ^
   "-DCMAKE_PREFIX_PATH=%REXGLUE_SDK_INSTALL%" ^
-  -DNHLLEGACY_VULKAN_BACKEND=ON
+  -DNHLLEGACY_VULKAN_BACKEND=ON ^
+  %EXTRA_CMAKE_ARGS%
 if errorlevel 1 exit /b 1
 cmake --build "out\build\win-amd64-vk-ffx" --target nhllegacy

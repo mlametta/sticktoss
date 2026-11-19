@@ -12,12 +12,21 @@ REM   REXGLUE_SDK_INSTALL  SDK install prefix the game links against
 REM   REXGLUE_FFX_PREBUILT prebuilt amd_fidelityfx_vk.dll/.lib (VS-generator build)
 REM   VULKAN_SDK           LunarG Vulkan SDK
 REM   VCVARS64             VS2022 vcvars64.bat (auto-discovered if unset)
+REM   EXTRA_CMAKE_ARGS     extra -D options every configure script appends
+REM   STICKTOSS_DEVTOOLS   portable toolchain folder made by scripts\setup_toolchain.ps1
+REM                        (usually set in the git-ignored scripts\_env.local.bat).
+REM                        When set, Visual Studio and the Vulkan SDK are NOT used.
 
 for %%i in ("%~dp0..") do set "REPO_ROOT=%%~fi"
 if not defined REXGLUE_SDK_SRC set "REXGLUE_SDK_SRC=%REPO_ROOT%\third_party\rexglue-sdk"
 set "REXGLUE_SDK_BUILD=%REXGLUE_SDK_SRC%\out\build\win-amd64-ffx"
 set "REXGLUE_SDK_INSTALL=%REXGLUE_SDK_SRC%\out\install\win-amd64-ffx"
 set "REXGLUE_FFX_PREBUILT=%REXGLUE_SDK_SRC%\out\ffx-prebuilt\vk"
+set "EXTRA_CMAKE_ARGS="
+
+REM Machine-specific settings (toolchain folder, game folder), git-ignored.
+if exist "%~dp0_env.local.bat" call "%~dp0_env.local.bat"
+if defined STICKTOSS_DEVTOOLS goto :portable
 
 REM Vulkan SDK: honor an existing VULKAN_SDK env var, else pick the newest
 REM installed under C:\VulkanSDK.
@@ -48,4 +57,35 @@ REM Prefer a standalone LLVM (clang 20+) when present; vcvars puts the VS-bundle
 REM clang on PATH otherwise.
 if exist "C:\Program Files\LLVM\bin\clang.exe" set "PATH=C:\Program Files\LLVM\bin;%PATH%"
 set "PATH=%VULKAN_SDK%\Bin;%PATH%"
+exit /b 0
+
+:portable
+REM Portable toolchain (scripts\setup_toolchain.ps1): LLVM + CMake + Ninja +
+REM embeddable Python + the MSVC runtime/Windows SDK fetched by xwin, all under
+REM one folder. Clean PATH (that folder + Windows system folders only) so nothing
+REM else installed on the machine is picked up; TEMP/TMP stay inside it too.
+set "DT=%STICKTOSS_DEVTOOLS%"
+if not exist "%DT%\llvm\bin\clang.exe" (
+  echo [env] ERROR: %DT% is not a complete toolchain ^(run scripts\setup_toolchain.ps1^)
+  exit /b 1
+)
+if not exist "%DT%\msvc\crt\include" (
+  echo [env] ERROR: %DT%\msvc missing ^(run scripts\setup_toolchain.ps1 -AcceptMicrosoftLicense^)
+  exit /b 1
+)
+set "TEMP=%DT%\tmp"
+set "TMP=%DT%\tmp"
+set "INCLUDE=%DT%\msvc\crt\include;%DT%\msvc\sdk\include\ucrt;%DT%\msvc\sdk\include\um;%DT%\msvc\sdk\include\shared;%DT%\msvc\sdk\include\winrt;%DT%\msvc\sdk\include\cppwinrt"
+set "LIB=%DT%\msvc\crt\lib\x86_64;%DT%\msvc\sdk\lib\um\x86_64;%DT%\msvc\sdk\lib\ucrt\x86_64"
+set "EXTERNAL_INCLUDE="
+set "LIBPATH="
+set "PATH=%DT%\llvm\bin;%DT%\cmake\bin;%DT%\ninja;%DT%\python;%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\WindowsPowerShell\v1.0"
+set "CC=clang"
+set "CXX=clang++"
+set "RC=llvm-rc"
+set "VULKAN_SDK="
+REM - portable Python for glslang / SPIRV-Tools code generation, never the registry
+REM - LLVM's resource compiler; never read the CMake package registry
+REM - sources CMake would otherwise clone with Git (pre-fetched by setup_toolchain)
+set "EXTRA_CMAKE_ARGS=-DPython3_EXECUTABLE=%DT%\python\python.exe -DPython3_FIND_REGISTRY=NEVER -DPython_EXECUTABLE=%DT%\python\python.exe -DPython_FIND_REGISTRY=NEVER -DCMAKE_RC_COMPILER=llvm-rc -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF -DFETCHCONTENT_SOURCE_DIR_GLSLANG=%DT%\src\glslang -DFETCHCONTENT_SOURCE_DIR_FIDELITYFX=%DT%\src\fidelityfx -DFETCHCONTENT_SOURCE_DIR_PLUME_DXC=%DT%\src\dxc-bin"
 exit /b 0
